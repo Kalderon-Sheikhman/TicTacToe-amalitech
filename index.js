@@ -1,460 +1,623 @@
-const gameBoard = document.getElementById("gameBoard");
-const gameMenu = document.getElementById("gameMenu");
-let X_pattern = [];
-let O_pattern = [];
-const winnerMark = document.getElementById("winner-mark");
-let turn = document.getElementById('turn');
-let allBox = document.getElementsByClassName("box");
-const player1Name = document.getElementById("player1Name");
-const player2Name = document.getElementById("player2Name");
-const cpuBtn = document.getElementById("cpuBtn");
-const playerBtn = document.getElementById("playerBtn");
-const XradioBtn = document.getElementById("X-mark");
-const OradioBtn = document.getElementById("O-mark");
-const cpuThinkMessage = document.getElementById("cpuThink");
-let winnerX = false;
-const winnerO = false;
-const box0 = document.getElementById("0");
-const box1 = document.getElementById("1");
-const box2 = document.getElementById("2");
-const box3 = document.getElementById("3");
-const box4 = document.getElementById("4");
-const box5 = document.getElementById("5");
-const box6 = document.getElementById("6");
-const box7 = document.getElementById("7");
-const box8 = document.getElementById("8");
+"use strict";
 
-let origBoard = Array.from(Array(9).keys());
-let huPlayer;
-let aiPlayer;
 
-const win_pattern = [
-    [0, 1, 2],
-    [3, 4, 5],
-    [6, 7, 8],
-    [0, 3, 6],
-    [1, 4, 7],
-    [2, 5, 8],
-    [0, 4, 8],
-    [2, 4, 6],
+const iconXBox = document.querySelector(".icon__x__box");
+const iconOBox = document.querySelector(".icon__o__box");
+const activeIconBox = document.querySelectorAll(".active__icon__box");
+const cells = document.querySelectorAll(".game__tiles");
+const thinkBox = document.querySelector(".think__box");
+const modalBox = document.querySelector(".modal__box");
+const modalContent = document.querySelector(".modal__content");
+const winLoseText = document.querySelector(".win__lose__text");
+const winnerIcon = document.querySelector(".winner__icon");
+const winnerText = document.querySelector(".winner__text");
+const displayTurnBox = document.querySelector(".display__turn__box");
+const xScores = document.querySelector(".x__scores");
+const oScores = document.querySelector(".o__scores");
+const tiesScores = document.querySelector(".ties__score");
+const restartModal = document.querySelector(".restart__modal");
+const restartContainer = document.querySelector(".restart__container");
+const restartText = document.querySelector(".restart__game");
+const noRestart = document.querySelector(".no__restart");
+const yesRestart = document.querySelector(".yes__restart");
+const tiedModal = document.querySelector(".tied__modal");
+const tiedContainer = document.querySelector(".tied__container");
+const overlay = document.querySelector(".overlay");
+
+const selectIconBox = document.querySelector(".select__icons");
+const vsCpu = document.querySelector(".select__cpu");
+const vsPlayer = document.querySelector(".select__player");
+const homeSection = document.querySelector(".home__section");
+const gameSection = document.querySelector(".game__section");
+const restartBox = document.querySelector(".restart__box");
+
+let currentPlayer = "x";
+let userChoice = "x";
+let computerChoice = "o";
+let gameMode;
+const showThinkingMessage = function () {
+  thinkBox.style.opacity = "1";
+  gameSection.classList.add("computer-turn");
+
+  setTimeout(function () {
+    thinkBox.style.opacity = "0";
+
+    if (currentPlayer === userChoice) {
+      enableCellClicks();
+    }
+  }, 2000);
+};
+
+const updateTurnDisplay = function () {
+  displayTurnBox.innerHTML = `
+    <svg class="select__turn__${currentPlayer ? currentPlayer : "x"}">
+      <use xlink:href="assets/icon-${
+        currentPlayer ? currentPlayer : "x"
+      }-select.svg#icon-${currentPlayer ? currentPlayer : "x"}"></use>
+    </svg>
+    <p class="turn__name">turn</p>
+  `;
+};
+
+const updateGameScoresText = function (xText, oText) {
+  const xPersonEl = document.querySelector(".x__name");
+  const oPersonEl = document.querySelector(".o__name");
+
+  xPersonEl.textContent = xText;
+  oPersonEl.textContent = oText;
+};
+
+const updateIconBox = function (e) {
+  const iconBox = e.target;
+  if (iconBox.closest(".icon__x__box")) {
+    iconBox.closest(".icon__x__box").classList.add("active__icon__box");
+    iconOBox.classList.remove("active__icon__box");
+
+    userChoice = "x";
+    computerChoice = "o";
+    currentPlayer = "x";
+    if (vsPlayer.classList.contains("active")) {
+      updateGameScoresText("x (p1)", "o (p2)");
+      gameSection.classList.add("x-choice");
+      gameSection.classList.remove("o-choice");
+    } else {
+      updateGameScoresText("x (you)", "o (cpu)");
+      gameSection.classList.remove("o-choice");
+      gameSection.classList.add("x-choice");
+    }
+  }
+  if (iconBox.closest(".icon__o__box")) {
+    iconBox.closest(".icon__o__box").classList.add("active__icon__box");
+    iconXBox.classList.remove("active__icon__box");
+
+    userChoice = "o";
+    computerChoice = "x";
+    currentPlayer = "x";
+    if (vsPlayer.classList.contains("active")) {
+      updateGameScoresText("x (p2)", "o (p1)");
+      gameSection.classList.add("x-choice");
+      gameSection.classList.remove("o-choice");
+    } else {
+      updateGameScoresText("x (cpu)", "o (you)");
+      gameSection.classList.add("o-choice");
+      gameSection.classList.remove("x-choice");
+    }
+  }
+};
+
+const winningCombinations = [
+  [0, 1, 2],
+  [3, 4, 5],
+  [6, 7, 8],
+  [0, 3, 6],
+  [1, 4, 7],
+  [2, 5, 8],
+  [0, 4, 8],
+  [2, 4, 6],
 ];
 
-function newGameCPU() {
+const checkWinner = function () {
+  for (const combination of winningCombinations) {
+    const [a, b, c] = combination;
+    if (
+      cells[a].classList.contains(`game__tiles__${currentPlayer}`) &&
+      cells[b].classList.contains(`game__tiles__${currentPlayer}`) &&
+      cells[c].classList.contains(`game__tiles__${currentPlayer}`)
+    ) {
+      updateScores(currentPlayer);
+      let icon, text, winnerClass;
+      if (currentPlayer === userChoice) {
+        icon = `icon-${userChoice}.svg`;
+        text = "You won";
+        winnerClass = `winner__${userChoice}`;
+      } else {
+        const lostChoice = userChoice === "x" ? "o" : "x";
+        icon = `icon-${lostChoice}.svg`;
+        text = `Oh no, you lost…`;
+        winnerClass = `winner__${lostChoice}`;
+      }
 
-    gameBoard.style.display = "initial";
-    gameMenu.style.display = "none";
-    if (XradioBtn.checked === true) {
-        huPlayer = 'X';
-        aiPlayer = 'O';
-        player1Name.innerHTML = "X (You)";
-        player2Name.innerHTML = "0 (CPU)";
+      winnerText.classList.remove(`winner__x`, `winner__o`);
+      winnerIcon.src = `assets/${icon}`;
+      winLoseText.textContent = text;
+      winnerText.classList.add(winnerClass);
+      if (currentPlayer !== userChoice) {
+        disableCellClicks();
+      }
+      setTimeout(() => {
+        showHiddenContainers(modalBox);
+      }, 500);
+
+      return true;
+    }
+  }
+
+  const isBoardFull = Array.from(cells).every((cell) => {
+    return (
+      cell.classList.contains("game__tiles__x") ||
+      cell.classList.contains("game__tiles__o")
+    );
+  });
+
+  if (isBoardFull) {
+    updateScores(null);
+    setTimeout(() => {
+      showHiddenContainers(tiedModal);
+    }, 500);
+
+    return true;
+  }
+
+  return false;
+};
+const checkWinnerVsPlayer = function () {
+  for (const combination of winningCombinations) {
+    const [a, b, c] = combination;
+    if (
+      cells[a].classList.contains(`game__tiles__x`) &&
+      cells[b].classList.contains(`game__tiles__x`) &&
+      cells[c].classList.contains(`game__tiles__x`)
+    ) {
+      updateScores("x");
+      winnerText.classList.remove(`winner__x`, `winner__o`);
+      winnerIcon.src = `assets/icon-x.svg`;
+      winLoseText.textContent = "Player 1 (X) wins";
+      winnerText.classList.add("winner__x");
+
+      // Show the modal
+      setTimeout(() => {
+        showHiddenContainers(modalBox);
+      }, 500);
+
+      return true;
+    }
+
+    if (
+      cells[a].classList.contains(`game__tiles__o`) &&
+      cells[b].classList.contains(`game__tiles__o`) &&
+      cells[c].classList.contains(`game__tiles__o`)
+    ) {
+      updateScores("o");
+      winnerText.classList.remove(`winner__x`, `winner__o`);
+      winnerIcon.src = `assets/icon-o.svg`;
+      winLoseText.textContent = "Player 2 (O) wins";
+      winnerText.classList.add("winner__o");
+
+      // Show the modal
+      setTimeout(() => {
+        showHiddenContainers(modalBox);
+      }, 500);
+
+      return true;
+    }
+  }
+
+  const isBoardFull = Array.from(cells).every((cell) => {
+    return (
+      cell.classList.contains("game__tiles__x") ||
+      cell.classList.contains("game__tiles__o")
+    );
+  });
+
+  if (isBoardFull) {
+    updateScores(null);
+
+    // Show the modal
+    showHiddenContainers(tiedModal);
+
+    return true;
+  }
+
+  return false;
+};
+
+const updateScores = function (winner) {
+  let xScore = parseInt(xScores.textContent);
+  let oScore = parseInt(oScores.textContent);
+  let tiesScore = parseInt(tiesScores.textContent);
+
+  if (winner === "x") {
+    xScore += 1;
+  } else if (winner === "o") {
+    oScore += 1;
+  } else {
+    tiesScore += 1;
+  }
+
+  xScores.textContent = xScore;
+  oScores.textContent = oScore;
+  tiesScores.textContent = tiesScore;
+};
+
+const playVsCpu = function (e) {
+  homeSection.style.display = "none";
+  gameSection.style.display = "grid";
+
+  currentPlayer = userChoice === "x" ? "o" : "x";
+
+  updateTurnDisplay();
+  if (currentPlayer === "x") {
+    computerMove();
+  }
+
+  gameMode = "vsCpu";
+};
+const computerMove = function () {
+  if (checkWinner()) {
+    return;
+  }
+  showThinkingMessage();
+  disableCellClicks();
+
+  disableCellClicks();
+  setTimeout(function () {
+    let selectedCellIndex = -1;
+
+    for (const combination of winningCombinations) {
+      const [a, b, c] = combination;
+      if (
+        cells[a].classList.contains(`game__tiles__${currentPlayer}`) &&
+        cells[b].classList.contains(`game__tiles__${currentPlayer}`) &&
+        !cells[c].classList.contains("game__tiles--filled")
+      ) {
+        selectedCellIndex = c;
+        break;
+      } else if (
+        cells[b].classList.contains(`game__tiles__${currentPlayer}`) &&
+        cells[c].classList.contains(`game__tiles__${currentPlayer}`) &&
+        !cells[a].classList.contains("game__tiles--filled")
+      ) {
+        selectedCellIndex = a;
+        break;
+      } else if (
+        cells[a].classList.contains(`game__tiles__${currentPlayer}`) &&
+        cells[c].classList.contains(`game__tiles__${currentPlayer}`) &&
+        !cells[b].classList.contains("game__tiles--filled")
+      ) {
+        selectedCellIndex = b;
+        break;
+      }
+    }
+
+    if (selectedCellIndex === -1) {
+      for (const combination of winningCombinations) {
+        const [a, b, c] = combination;
+        if (
+          cells[a].classList.contains(`game__tiles__${userChoice}`) &&
+          cells[b].classList.contains(`game__tiles__${userChoice}`) &&
+          !cells[c].classList.contains("game__tiles--filled")
+        ) {
+          selectedCellIndex = c;
+          break;
+        } else if (
+          cells[b].classList.contains(`game__tiles__${userChoice}`) &&
+          cells[c].classList.contains(`game__tiles__${userChoice}`) &&
+          !cells[a].classList.contains("game__tiles--filled")
+        ) {
+          selectedCellIndex = a;
+          break;
+        } else if (
+          cells[a].classList.contains(`game__tiles__${userChoice}`) &&
+          cells[c].classList.contains(`game__tiles__${userChoice}`) &&
+          !cells[b].classList.contains("game__tiles--filled")
+        ) {
+          selectedCellIndex = b;
+          break;
+        }
+      }
+    }
+
+    if (selectedCellIndex === -1) {
+      do {
+        selectedCellIndex = Math.floor(Math.random() * 9);
+      } while (
+        cells[selectedCellIndex].classList.contains("game__tiles--filled")
+      );
+    }
+
+    cells[
+      selectedCellIndex
+    ].style.backgroundImage = `url(assets/icon-${currentPlayer}.svg)`;
+    cells[selectedCellIndex].classList.add(
+      `game__tiles__${currentPlayer}`,
+      "game__tiles--filled",
+      "computer-icon"
+    );
+
+    if (checkWinner()) {
+      return;
+    }
+
+    currentPlayer = currentPlayer === "x" ? "o" : "x";
+
+    updateTurnDisplay();
+
+    if (userChoice === "o" && currentPlayer === "x") {
+      computerMove();
+    } else if (userChoice === "x" && currentPlayer === "o") {
+      computerMove();
+    }
+
+    gameSection.classList.remove("computer-turn");
+    enableCellClicks();
+  }, 2000);
+};
+
+const playerMove = function () {
+  if (
+    !this.classList.contains("game__tiles__x") &&
+    !this.classList.contains("game__tiles__o") &&
+    userChoice &&
+    !checkWinner()
+  ) {
+    this.style.backgroundImage = `url(assets/icon-${userChoice}.svg)`;
+
+    this.classList.add(`game__tiles__${userChoice}`, "game__tiles--filled");
+
+    if (checkWinner()) return;
+
+    currentPlayer = userChoice === "x" ? "o" : "x";
+
+    updateTurnDisplay();
+    if (userChoice === "o" && currentPlayer === "x") {
+      computerMove();
+    } else if (userChoice === "x" && currentPlayer === "o") {
+      computerMove();
+    }
+  }
+};
+
+const playVsPlayer = function () {
+  homeSection.style.display = "none";
+  gameSection.style.display = "grid";
+
+  currentPlayer = "x"; // Set the current player as "x" by default
+  updateTurnDisplay(); // Update the turn display in the game header
+  gameMode = "vsPlayer";
+  gameSection.classList.remove("o-choice");
+  gameSection.classList.add("x-choice");
+};
+
+const vsPlayerMove = function () {
+  if (
+    !this.classList.contains("game__tiles__x") &&
+    !this.classList.contains("game__tiles__o") &&
+    !checkWinnerVsPlayer()
+  ) {
+    this.style.backgroundImage = `url(assets/icon-${currentPlayer}.svg)`;
+
+    this.classList.add(`game__tiles__${currentPlayer}`, "game__tiles--filled");
+
+    if (checkWinnerVsPlayer()) return;
+
+    currentPlayer = currentPlayer === "x" ? "o" : "x";
+
+    updateTurnDisplay();
+
+    if (currentPlayer === "x") {
+      gameSection.classList.remove("o-choice");
+      gameSection.classList.add("x-choice");
     } else {
-        huPlayer = 'O';
-        aiPlayer = 'X';
-        player1Name.innerHTML = "X (CPU)";
-        player2Name.innerHTML = "0 (You)";
+      gameSection.classList.remove("x-choice");
+      gameSection.classList.add("o-choice");
     }
-    cpuBtn.setAttribute("data-value", "active");
-    playerBtn.setAttribute("data-value", "");
-
-    cpuTurn(); 
+  }
 };
 
-function newGamePlayer() {
-    gameBoard.style.display = "initial";
-    gameMenu.style.display = "none";
-    player1Name.innerHTML = "X (P1)";
-    player2Name.innerHTML = "0 (P2)";
-    playerBtn.setAttribute("data-value", "active")
-    cpuBtn.setAttribute("data-value", "")
+const disableCellClicks = function () {
+  cells.forEach((cell) => {
+    cell.removeEventListener("click", playerMove);
+  });
+  gameSection.classList.add("computer-turn");
 };
 
-function restartGame() {
-    window.location.reload();
+const enableCellClicks = function () {
+  cells.forEach((cell) => {
+    cell.addEventListener("click", playerMove);
+  });
+  gameSection.classList.remove("computer-turn");
 };
 
-function hitBox(box) {
-    let boxChoice = document.getElementById(box);
-    let img = document.createElement('img');
+const resetGame = function () {
+  selectIconBox.removeEventListener("click", updateIconBox);
 
-    if (turn.getAttribute("data-value") === "X") {
-        img.src = "./assets/icon-x.svg";
-        img.setAttribute("class", "boxPlayed");
-        boxChoice.appendChild(img);
-        boxChoice.classList.remove("hoverClassX");
-        boxChoice.setAttribute("data-value", "X");
-        boxChoice.setAttribute("onclick", "");
-        turn.setAttribute("data-value", "O");
-        turn.src = "./assets/icon-o-turn.svg";
-        X_pattern.push(parseInt(boxChoice.id, 10));
-        X_pattern.sort();
-        if (XradioBtn.checked === true) {
-            origBoard.splice(parseInt(boxChoice.id, 10), 1, (parseInt(boxChoice.id, 10), huPlayer));
-        } else {
-            origBoard.splice(parseInt(boxChoice.id, 10), 1, (parseInt(boxChoice.id, 10), aiPlayer));
+  cells.forEach((cell) => {
+    cell.style.backgroundImage = "";
+    cell.classList.remove(
+      "game__tiles__x",
+      "game__tiles__o",
+      "game__tiles--filled"
+    );
+  });
 
-        }
-        for (empty of allBox) {
-            if (empty.getAttribute("data-value") === "") {
-            empty.classList.add("hoverClassO");
-            empty.classList.remove("hoverClassX");
-            }
-        }
-        checkWin(X_pattern);
-    } else {
-        img.src = "./assets/icon-o.svg";
-        img.setAttribute("class", "boxPlayed");
-        boxChoice.appendChild(img);
-        boxChoice.classList.remove("hoverClassO");
-        boxChoice.setAttribute("data-value", "O");
-        boxChoice.setAttribute("onclick", "");
-        turn.setAttribute("data-value", "X");
-        turn.src = "./assets/icon-x-turn.svg";
-        O_pattern.push(parseInt(boxChoice.id, 10));
-        O_pattern.sort();
-        if (OradioBtn.checked === true) {
-            origBoard.splice(parseInt(boxChoice.id, 10), 1, (parseInt(boxChoice.id, 10), huPlayer));
-        } else {
-            origBoard.splice(parseInt(boxChoice.id, 10), 1, (parseInt(boxChoice.id, 10), aiPlayer));
+  const previousUserChoice = userChoice;
 
-        }
-        for (empty of allBox) {
-            if (empty.getAttribute("data-value") === "") {
-            empty.classList.add("hoverClassX");
-            empty.classList.remove("hoverClassO");
-            }
-        }
-        checkWin(O_pattern);
-    }
+  currentPlayer = "x";
+  userChoice = "x";
+  computerChoice = "o";
 
-    if (cpuBtn.getAttribute("data-value") === "active") {
-        cpuTurn();
-    }
+  gameSection.classList.remove("o-choice");
+  gameSection.classList.add("x-choice");
+
+  enableCellClicks();
+
+  selectIconBox.addEventListener("click", updateIconBox);
+
+  if (previousUserChoice === "o") {
+    userChoice = "o";
+    computerChoice = "x";
+    gameSection.classList.remove("x-choice");
+    gameSection.classList.add("o-choice");
+  }
+
+  updateTurnDisplay();
+
+  if (computerChoice === "x") {
+    computerMove();
+  }
 };
 
-let isThereWinner = false;
+const resetPlayerGame = function () {
+  currentPlayer = "x";
 
-function checkWin(currentPlayer) {
-
-        for (some of win_pattern) {
-        const isContainedIn = (a, b) => {
-            for (const v of new Set(a)) {
-              if (!b.some(e => e === v)) 
-                return false;
-            }
-            for (empty of allBox) {
-                if (empty.getAttribute("data-value") === "") {
-                    empty.classList.remove("hoverClassX");
-                    empty.classList.remove("hoverClassO");
-                    empty.setAttribute("onclick", "");
-                }
-            }
-            isThereWinner = true;
-            results();
-            return true;
-        }
-        isContainedIn(some, currentPlayer);
-    }
-    
-    if (isThereWinner === false && X_pattern.length === 5 && O_pattern.length === 4) {
-        for (all of allBox) {
-            all.classList.remove("hoverClassO");
-            all.classList.remove("hoverClassX");
-            all.setAttribute("onclick", "");
-        }
-        draw();
-    }
+  cells.forEach((cell) => {
+    cell.style.backgroundImage = "";
+    cell.classList.remove(
+      "game__tiles__x",
+      "game__tiles__o",
+      "game__tiles--filled"
+    );
+  });
+  gameSection.classList.remove("o-choice");
+  gameSection.classList.add("x-choice");
+  updateTurnDisplay();
+};
+const resetScores = function () {
+  const xScores = document.querySelector(".x__scores");
+  const oScores = document.querySelector(".o__scores");
+  const tiesScore = document.querySelector(".ties__score");
+  xScores.textContent = "0";
+  oScores.textContent = "0";
+  tiesScore.textContent = "0";
 };
 
-async function cpuTurn() {
-
-
-    if (XradioBtn.checked === true) {
-        const promise = new Promise ((resolve,reject) => {
-            if (turn.getAttribute("data-value") === "O") {
-                box0.setAttribute("onclick", "");
-                box1.setAttribute("onclick", "");
-                box2.setAttribute("onclick", "");
-                box3.setAttribute("onclick", "");
-                box4.setAttribute("onclick", "");
-                box5.setAttribute("onclick", "");
-                box6.setAttribute("onclick", "");
-                box7.setAttribute("onclick", "");
-                box8.setAttribute("onclick", "");
-            resolve();
-            }
-            if (winnerX === true) {
-            reject();
-            } 
-        });
-        await promise;
-
-        setTimeout(cpuPlay, 3000);
-        cpuThink();
-    };
-
-    if (OradioBtn.checked === true) {
-        const promise = new Promise ((resolve) => {
-            if (turn.getAttribute("data-value") === "X") {
-                box0.setAttribute("onclick", "");
-                box1.setAttribute("onclick", "");
-                box2.setAttribute("onclick", "");
-                box3.setAttribute("onclick", "");
-                box4.setAttribute("onclick", "");
-                box5.setAttribute("onclick", "");
-                box6.setAttribute("onclick", "");
-                box7.setAttribute("onclick", "");
-                box8.setAttribute("onclick", "");
-            resolve();
-            }
-            if (winnerO === true) {
-                reject();
-                } 
-        });
-        await promise;
-        setTimeout(cpuPlay, 2500);
-        cpuThink();
-    };
+const showHiddenContainers = function (container) {
+  container.style.opacity = "1";
+  container.style.visibility = "visible";
+  container.style.transform = "translateY(0)";
+  overlay.style.display = "block";
 };
 
-
-function printLetterByLetter(destination, message, speed){
-    let i = 0;
-    let interval = setInterval(function(){
-        document.getElementById(destination).innerHTML += message.charAt(i);
-        i++;
-        if (i > message.length){
-            clearInterval(interval);
-        }
-    }, speed);
-    document.getElementById(destination).innerHTML = "";
-}
-
-function cpuThink() {
-    cpuThinkMessage.style.display = "initial";
-    printLetterByLetter("cpuThinkMessage", "CPU think...", 150);    
-}
-
-function bestSpot() {
-	return minimax(origBoard, aiPlayer).index;
-}
-
-function cpuPlay() {
-    cpuThinkMessage.style.display = "none";
-    hitBox(bestSpot());
-
-    // console.log(origBoard);
-    // console.log(minimax(origBoard, aiPlayer).index);
-
-        box0.setAttribute("onclick", "hitBox('0')");
-        box1.setAttribute("onclick", "hitBox('1')");
-        box2.setAttribute("onclick", "hitBox('2')");
-        box3.setAttribute("onclick", "hitBox('3')");
-        box4.setAttribute("onclick", "hitBox('4')");
-        box5.setAttribute("onclick", "hitBox('5')");
-        box6.setAttribute("onclick", "hitBox('6')");
-        box7.setAttribute("onclick", "hitBox('7')");
-        box8.setAttribute("onclick", "hitBox('8')");
-}
-
-//      Modal      //
-
-const modal = document.getElementById("modal");
-const endGame = document.getElementById("endGameModal");
-const restartingGame = document.getElementById("restartGame");
-const winnerTakes = document.getElementById("winnerTakes");
-const winnerName = document.getElementById("winnerName");
-const Xscore = document.getElementById("Xscore");
-const drawScore = document.getElementById("draw");
-const Oscore = document.getElementById("Oscore");
-
-
-
-function results() {
-    modal.style.display = "initial";
-    endGame.style.display = "flex";
-    restartingGame.style.display = "none";
-
-    if (turn.getAttribute("data-value") === "O") {
-
-        winnerName.style.display = "initial";
-
-        if (playerBtn.getAttribute("data-value") === "active") {
-            if (XradioBtn.checked === true) {
-                winnerName.innerHTML = "Player 1 wins!";
-            } 
-            if (OradioBtn.checked === true) {
-                winnerName.innerHTML = "Player 1 wins!"; 
-            }
-        } 
-        if (cpuBtn.getAttribute("data-value") === "active") {
-            if (XradioBtn.checked === true) {
-                winnerName.innerHTML = "You won!";
-            } 
-            if (OradioBtn.checked === true) {
-                winnerName.innerHTML = "Oh no, you lost..."; 
-            }
-        }
-
-        winnerMark.src = "./assets/icon-x.svg";
-        winnerMark.style.display = "initial";
-        winnerTakes.style = "color: hsl( let(--clr-lightBlue) );";
-        winnerTakes.innerHTML = "takes the round";
-        Xscore.innerHTML++;
-        winnerX = true;
-
-    } else {
-        winnerName.style.display = "initial";
-        if (playerBtn.getAttribute("data-value") === "active") {
-            if (OradioBtn.checked === true) {
-                winnerName.innerHTML = "Player 2 wins!";
-            } 
-            if (XradioBtn.checked === true) {
-                winnerName.innerHTML = "Player 2 wins!"; 
-            }
-        } 
-        if (cpuBtn.getAttribute("data-value") === "active") {
-            if (OradioBtn.checked === true) {
-                winnerName.innerHTML = "You won!";
-            } 
-            if (XradioBtn.checked === true) {
-                winnerName.innerHTML = "Oh no, you lost..."; 
-            }
-        }
-        winnerMark.src = "./assets/icon-o.svg";
-        winnerMark.style.display = "initial";
-        winnerTakes.style = "color: hsl( let(--clr-orange) );";
-        winnerTakes.innerHTML = "takes the round";
-        Oscore.innerHTML++;
-        winnerO = true;
-    }
-}
-
-function draw() {
-    modal.style.display = "initial";
-    endGame.style.display = "flex";
-    restartingGame.style.display = "none";
-    winnerMark.style.display = "none";
-    winnerTakes.innerHTML = "round tied";
-    winnerTakes.style = "color: hsl( let(--clr-silver) );";
-    winnerName.style.display = "none";
-    drawScore.innerHTML++;
-}
-
-function nextRound() {
-    let boxPlayed = document.querySelectorAll(".boxPlayed");
-
-    modal.style.display = "none";
-    endGame.style.display = "none";
-    restartingGame.style.display = "none";
-    for (all of boxPlayed) {
-        all.parentNode.removeChild(all);
-    }
-
-    for (all of allBox) {
-        all.setAttribute("data-value", "");
-        all.classList.add("hoverClassX");
-    }
-    turn.setAttribute("data-value", "X");
-    turn.src = "./assets/icon-x-turn.svg";
-    box0.setAttribute("onclick", "hitBox('0')");
-    box1.setAttribute("onclick", "hitBox('1')");
-    box2.setAttribute("onclick", "hitBox('2')");
-    box3.setAttribute("onclick", "hitBox('3')");
-    box4.setAttribute("onclick", "hitBox('4')");
-    box5.setAttribute("onclick", "hitBox('5')");
-    box6.setAttribute("onclick", "hitBox('6')");
-    box7.setAttribute("onclick", "hitBox('7')");
-    box8.setAttribute("onclick", "hitBox('8')");
-    X_pattern = [];
-    O_pattern = [];
-    origBoard = Array.from(Array(9).keys());
-    cpuTurn(); 
-}
-
-function displayModalRestart() {
-    modal.style.display = "initial";
-    endGame.style.display = "none";
-    restartingGame.style.display = "flex";
+const hideContainers = function (container) {
+  container.style.opacity = "0";
+  container.style.visibility = "hidden";
+  container.style.transform = "translateY(100%)";
+  overlay.style.display = "none";
 };
 
-function cancelReset() {
-    modal.style.display = "none";
-    checkWin(O_pattern);
-    checkWin(X_pattern);
+const handleTiedResult = function (e) {
+  const quit = e.target.classList.contains("quit__box");
+  const nextRound = e.target.classList.contains("next__round");
+
+  if (quit) {
+    if (gameMode === "vsCpu") {
+      resetGame();
+    } else if (gameMode === "vsPlayer") {
+      resetPlayerGame();
+    }
+    resetScores();
+    location.reload();
+
+    hideContainers(tiedModal);
+  }
+
+  if (nextRound) {
+    if (gameMode === "vsCpu") {
+      resetGame();
+    } else if (gameMode === "vsPlayer") {
+      resetPlayerGame();
+    }
+    hideContainers(tiedModal);
+  }
 };
 
+const handleWinOrLoseResult = function (e) {
+  const quitGame = e.target.classList.contains("quit__box");
+  const nextRound = e.target.classList.contains("next__round");
 
+  if (quitGame) {
+    if (gameMode === "vsCpu") {
+      resetGame();
+    } else if (gameMode === "vsPlayer") {
+      resetPlayerGame();
+    }
 
-//    MiniMax    //
+    resetScores();
+    location.reload();
+    hideContainers(modalBox);
+  }
 
+  if (nextRound) {
+    if (gameMode === "vsCpu") {
+      resetGame();
+    } else if (gameMode === "vsPlayer") {
+      resetPlayerGame();
+    }
 
+    hideContainers(modalBox);
+  }
+};
 
-function emptySquares() {
-	return origBoard.filter(s => typeof s == 'number');
-}
+const handleRestart = function (e) {
+  const noRestart = e.target.classList.contains("no__restart");
+  const yesRestart = e.target.classList.contains("yes__restart");
 
-function checkWinner(board, player) {
-	let plays = board.reduce((a, e, i) =>
-		(e === player) ? a.concat(i) : a, []);
-	let gameWon = null;
-	for (let [index, win] of win_pattern.entries()) {
-		if (win.every(elem => plays.indexOf(elem) > -1)) {
-			gameWon = {index: index, player: player};
-			break;
-		}
-	}
-	return gameWon;
-}
+  if (noRestart) {
+    hideContainers(restartModal);
+  }
 
-function minimax(newBoard, player) {
+  if (yesRestart) {
+    if (gameMode === "vsCpu") {
+      resetGame();
+    } else if (gameMode === "vsPlayer") {
+      resetPlayerGame();
+    }
+    hideContainers(restartModal);
+  }
+};
 
-	let availSpots = emptySquares();
+modalContent.addEventListener("click", handleWinOrLoseResult);
 
-	if (checkWinner(newBoard, huPlayer)) {
-		return {score: -10};
-	} else if (checkWinner(newBoard, aiPlayer)) {
-		return {score: 10};
-	} else if (availSpots.length === 0) {
-		return {score: 0};
-	}
-	let moves = [];
-	for (let i = 0; i < availSpots.length; i++) {
-		let move = {};
-		move.index = newBoard[availSpots[i]];
-		newBoard[availSpots[i]] = player;
+restartBox.addEventListener("click", function () {
+  showHiddenContainers(restartModal);
+});
 
-		if (player == aiPlayer) {
-			let result = minimax(newBoard, huPlayer);
-			move.score = result.score;
-		} else {
-			let result = minimax(newBoard, aiPlayer);
-			move.score = result.score;
-		}
+restartContainer.addEventListener("click", handleRestart);
 
-		newBoard[availSpots[i]] = move.index;
+tiedContainer.addEventListener("click", handleTiedResult);
 
-		moves.push(move);
-	}
+selectIconBox.addEventListener("click", updateIconBox);
 
-	let bestMove;
-	if(player === aiPlayer) {
-		let bestScore = -10000;
-		for(let i = 0; i < moves.length; i++) {
-			if (moves[i].score > bestScore) {
-				bestScore = moves[i].score;
-				bestMove = i;
-			}
-		}
-	} else {
-		let bestScore = 10000;
-		for(let i = 0; i < moves.length; i++) {
-			if (moves[i].score < bestScore) {
-				bestScore = moves[i].score;
-				bestMove = i;
-			}
-		}
-	}
+vsCpu.addEventListener("click", function () {
+  playVsCpu();
 
-	return moves[bestMove];
-}
+  cells.forEach((cell) => {
+    cell.addEventListener("click", playerMove);
+  });
+});
+
+vsPlayer.addEventListener("click", function () {
+  vsPlayer.classList.add("active");
+  playVsPlayer();
+  if (iconXBox.classList.contains("active__icon__box"))
+    updateGameScoresText("x (p1)", "o (p2)");
+
+  if (iconOBox.classList.contains("active__icon__box"))
+    updateGameScoresText("x (p2)", "o (p1)");
+
+  cells.forEach((cell) => {
+    cell.addEventListener("click", vsPlayerMove);
+  });
+
+  vsCpu.classList.remove("active");
+});
